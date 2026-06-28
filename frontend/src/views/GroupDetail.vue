@@ -47,7 +47,17 @@
                   <span>退票服务费：{{ trip.summary.refundCount }}张 × {{ config?.refundServiceFee || 20 }}元 = {{ trip.summary.refundFee }}元</span>
                 </div>
                 <div class="summary-row">
-                  <span>核验费：{{ trip.verifyCount }}次 × {{ config?.foreignIdVerify || 8 }}元 = {{ trip.summary.verifyFee }}元</span>
+                  <span>核验费：
+                    <el-input-number
+                      v-model="trip.verifyCount"
+                      :min="0"
+                      :max="999"
+                      size="small"
+                      style="width: 80px; margin: 0 5px;"
+                      @change="updateVerifyCount(trip)"
+                    />
+                    次 × {{ config?.foreignIdVerify || 8 }}元 = {{ trip.summary.verifyFee }}元
+                  </span>
                 </div>
                 <el-divider />
                 <div class="summary-row total">
@@ -344,6 +354,26 @@ const copyTotalInfo = async () => {
 
   await copyToClipboard(text)
   ElMessage.success('已复制团信息到剪贴板')
+}
+
+// 更新核验次数
+const updateVerifyCount = async (trip) => {
+  try {
+    await groupApi.update(trip.id, { verifyCount: trip.verifyCount })
+    // 重新计算当前 trip 的 summary
+    const adultCount = trip.members.filter(m => m.ticketType === '成人' && m.status === '正常').length
+    const childCount = trip.members.filter(m => m.ticketType === '儿童' && m.status === '正常').length
+    const refundCount = trip.members.filter(m => m.status === '退票').length
+    const serviceFeeCount = trip.serviceFeeCount || trip.members.length
+    const ticketTotal = adultCount * trip.adultPrice + childCount * trip.childPrice
+    const serviceFee = serviceFeeCount * (config.value?.serviceFee || 10)
+    const refundFee = refundCount * (config.value?.refundServiceFee || 20)
+    const verifyFee = trip.verifyCount * (config.value?.foreignIdVerify || 8)
+    trip.summary = { adultCount, childCount, refundCount, serviceFeeCount, ticketTotal, serviceFee, refundFee, verifyFee, total: ticketTotal + serviceFee + refundFee + verifyFee }
+    ElMessage.success('已更新核验次数')
+  } catch (error) {
+    ElMessage.error('更新失败')
+  }
 }
 
 const editTrip = (trip) => {
