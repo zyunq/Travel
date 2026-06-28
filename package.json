@@ -1,0 +1,21 @@
+{
+  "name": "travel-system",
+  "version": "1.0.0",
+  "description": "Travel group train ticket management system",
+  "scripts": {
+    "dev": "concurrently -n \"backend,frontend\" -c \"blue,green\" \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "dev:backend": "cd backend && npm run dev",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:uniapp": "cd uniapp && npm run dev:mp-weixin",
+    "dev:all": "concurrently -n \"backend,frontend,uniapp\" -c \"blue,green,yellow\" \"npm run dev:backend\" \"npm run dev:frontend\" \"npm run dev:uniapp\"",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../uniapp && npm install",
+    "start": "npm run dev",
+    "start:all": "npm run dev:all"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "keywords": ["travel", "train", "ticket"],
+  "author": "",
+  "license": "ISC"
+}

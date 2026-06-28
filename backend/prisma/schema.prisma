@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Group {
+  id              Int      @id @default(autoincrement())
+  name            String
+  groupName       String
+  category        String?  @default("")
+  tripType        String   @default("去程")
+  departDate      String
+  trainNo         String
+  route           String
+  adultPrice      Float
+  childPrice      Float
+  verifyCount     Int      @default(0)
+  serviceFeeCount Int      @default(0)  // 累计购票张数（只增不减）
+  members         Member[]
+}
+
+model Member {
+  id            Int     @id @default(autoincrement())
+  groupId       Int
+  idType        String
+  name          String
+  idNumber      String
+  date          String
+  trainNo       String
+  departStation String
+  arriveStation String
+  seatClass     String
+  carriage      String
+  seatNo        String
+  price         Float
+  orderNo       String
+  ticketType    String  @default("成人")
+  status        String  @default("正常")
+  group         Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+}
+
+model FeeConfig {
+  id                Int   @id @default(1)
+  serviceFee        Float @default(10)
+  refundServiceFee  Float @default(20)
+  foreignIdVerify   Float @default(8)
+  electronicInvoice Float @default(3)
+}
+
+model User {
+  id       Int    @id @default(autoincrement())
+  username String @unique
+  password String
+  name     String
+  role     String @default("user")
+}

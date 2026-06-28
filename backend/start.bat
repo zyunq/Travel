@@ -1,0 +1,9 @@
+@echo off
+echo 正在生成 Prisma 客户端...
+call npx prisma generate
+echo.
+echo 正在初始化数据库...
+call node setup-db.js
+echo.
+echo 正在启动服务器...
+call node app.js
