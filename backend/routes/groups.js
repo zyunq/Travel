@@ -208,7 +208,7 @@ router.get('/:id/copy', async (req, res) => {
 退票服务费：${refundCount}张 × ${config?.refundServiceFee || 20}元 = ${refundFee}元
 核验费：${group.verifyCount}次 × ${config?.foreignIdVerify || 8}元 = ${verifyFee}元
 ────────────────────
-共计：${total}元`;
+共计：${ticketTotal} + ${serviceFee} + ${refundFee} + ${verifyFee} = ${total}元`;
 
   res.json({ text });
 });

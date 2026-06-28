@@ -340,7 +340,7 @@ const copyTotalInfo = async () => {
   text += `退票服务费：${totalSummary.value.refundFee}元\n`
   text += `核验费：${totalSummary.value.verifyFee}元\n`
   text += `────────────────────\n`
-  text += `共计：${totalSummary.value.total}元`
+  text += `共计：${totalSummary.value.ticketTotal} + ${totalSummary.value.serviceFee} + ${totalSummary.value.refundFee} + ${totalSummary.value.verifyFee} = ${totalSummary.value.total}元`
 
   await copyToClipboard(text)
   ElMessage.success('已复制团信息到剪贴板')
