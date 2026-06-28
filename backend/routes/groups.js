@@ -345,7 +345,7 @@ router.get('/:id/seats', async (req, res) => {
     }
 
     const result = await new Promise((resolve, reject) => {
-      const python = spawn('python', [pythonScript, tempInputPath, tempOutputPath]);
+      const python = spawn('python3', [pythonScript, tempInputPath, tempOutputPath]);
 
       let output = '';
       let errorOutput = '';
