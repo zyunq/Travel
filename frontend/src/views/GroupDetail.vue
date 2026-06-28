@@ -292,9 +292,26 @@ const filterMembers = (members, tripId) => {
   return members.filter(m => m.name.toLowerCase().includes(search))
 }
 
+// 兼容 HTTP 环境的复制函数
+const copyToClipboard = async (text) => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    await navigator.clipboard.writeText(text)
+  } else {
+    // HTTP 环境下的兼容方案
+    const textarea = document.createElement('textarea')
+    textarea.value = text
+    textarea.style.position = 'fixed'
+    textarea.style.left = '-9999px'
+    document.body.appendChild(textarea)
+    textarea.select()
+    document.execCommand('copy')
+    document.body.removeChild(textarea)
+  }
+}
+
 const copyTripInfo = async (tripId) => {
   const { data } = await groupApi.copyInfo(tripId)
-  await navigator.clipboard.writeText(data.text)
+  await copyToClipboard(data.text)
   ElMessage.success('已复制到剪贴板')
 }
 
@@ -325,7 +342,7 @@ const copyTotalInfo = async () => {
   text += `────────────────────\n`
   text += `共计：${totalSummary.value.total}元`
 
-  await navigator.clipboard.writeText(text)
+  await copyToClipboard(text)
   ElMessage.success('已复制团信息到剪贴板')
 }
 
