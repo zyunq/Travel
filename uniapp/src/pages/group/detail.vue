@@ -75,6 +75,17 @@
           <text class="fee-label">退票费</text>
           <text class="fee-value refund">¥{{ summary.refundFee }}</text>
         </view>
+        <view class="fee-row">
+          <text class="fee-label">核验费（</text>
+          <input
+            type="number"
+            class="verify-input"
+            v-model.number="groupInfo.verifyCount"
+            @blur="updateVerifyCount"
+          />
+          <text class="fee-label">次）</text>
+          <text class="fee-value">¥{{ summary.verifyFee }}</text>
+        </view>
         <view class="fee-row total">
           <text class="fee-label">总计</text>
           <text class="fee-value">¥{{ summary.total }}</text>
@@ -271,7 +282,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 
-const BASE_URL = 'http://192.168.1.20:3000/api'
+const BASE_URL = 'http://101.34.71.12:3000/api'
 
 const groupInfo = ref({})
 const members = ref([])
@@ -284,7 +295,9 @@ const summary = reactive({
   refundCount: 0,
   ticketTotal: 0,
   serviceFee: 0,
+  serviceFeeCount: 0,
   refundFee: 0,
+  verifyFee: 0,
   total: 0
 })
 
@@ -464,6 +477,40 @@ const deleteMember = async (member) => {
     loadDetail()
   } catch (e) {
     uni.showToast({ title: '删除失败', icon: 'none' })
+  }
+}
+
+// 更新核验次数
+const updateVerifyCount = async () => {
+  if (!groupInfo.value.id) return
+
+  try {
+    await new Promise((resolve, reject) => {
+      uni.request({
+        url: BASE_URL + '/groups/' + groupInfo.value.id,
+        method: 'PUT',
+        data: { verifyCount: groupInfo.value.verifyCount || 0 },
+        success: (r) => resolve(r.data),
+        fail: reject
+      })
+    })
+
+    // 重新计算 summary
+    const config = await new Promise((resolve, reject) => {
+      uni.request({
+        url: BASE_URL + '/config',
+        success: (r) => resolve(r.data),
+        fail: reject
+      })
+    })
+
+    const verifyFee = (groupInfo.value.verifyCount || 0) * (config?.foreignIdVerify || 8)
+    summary.verifyFee = verifyFee
+    summary.total = summary.ticketTotal + summary.serviceFee + summary.refundFee + verifyFee
+
+    uni.showToast({ title: '已更新', icon: 'success' })
+  } catch (e) {
+    uni.showToast({ title: '更新失败', icon: 'none' })
   }
 }
 
@@ -735,6 +782,16 @@ onMounted(loadDetail)
   display: flex;
   justify-content: space-between;
   align-items: center;
+}
+
+.verify-input {
+  width: 60rpx;
+  height: 48rpx;
+  border: 1px solid #d1d5db;
+  border-radius: 8rpx;
+  text-align: center;
+  font-size: 26rpx;
+  background: #f9fafb;
 }
 
 .fee-label {

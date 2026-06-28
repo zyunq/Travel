@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 
 // API 基础地址 - 小程序必须使用完整URL
-const BASE_URL = 'http://192.168.1.20:3000/api'
+const BASE_URL = 'http://101.34.71.12:3000/api'
 
 export const useUserStore = defineStore('user', () => {
   // 状态

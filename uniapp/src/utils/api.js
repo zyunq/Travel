@@ -1,6 +1,6 @@
 // API 基础配置
 // 小程序必须使用完整URL（包括 http://）
-const BASE_URL = 'http://192.168.1.20:3000/api'
+const BASE_URL = 'http://101.34.71.12:3000/api'
 
 // 请求封装
 const request = (options) => {
