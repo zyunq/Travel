@@ -281,8 +281,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
-
-const BASE_URL = 'http://101.34.71.12:3000/api'
+import { BASE_URL } from '@/config'
 
 const groupInfo = ref({})
 const members = ref([])

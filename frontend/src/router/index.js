@@ -3,12 +3,16 @@ import Login from '../views/Login.vue'
 import GroupList from '../views/GroupList.vue'
 import GroupDetail from '../views/GroupDetail.vue'
 import Config from '../views/Config.vue'
+import OCR from '../views/OCR.vue'
+import Compare from '../views/Compare.vue'
 
 const routes = [
   { path: '/login', name: 'Login', component: Login },
   { path: '/', name: 'GroupList', component: GroupList, meta: { requiresAuth: true } },
   { path: '/group/:groupName', name: 'GroupDetail', component: GroupDetail, meta: { requiresAuth: true } },
-  { path: '/config', name: 'Config', component: Config, meta: { requiresAuth: true } }
+  { path: '/config', name: 'Config', component: Config, meta: { requiresAuth: true } },
+  { path: '/ocr', name: 'OCR', component: OCR, meta: { requiresAuth: true } },
+  { path: '/compare', name: 'Compare', component: Compare, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({

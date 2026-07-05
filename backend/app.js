@@ -94,11 +94,13 @@ const configRouter = require('./routes/config');
 const groupsRouter = require('./routes/groups');
 const membersRouter = require('./routes/members');
 const authRouter = require('./routes/auth');
+const ocrRouter = require('./routes/ocr');
 
 app.use('/api/config', configRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api', membersRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/ocr', ocrRouter);
 
 // 健康检查
 app.get('/api/health', (req, res) => {
