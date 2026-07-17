@@ -7,7 +7,7 @@ const API_CONFIG = {
   // 开发环境
   dev: 'http://localhost:3000/api',
   // 生产环境
-  prod: 'http://101.34.71.12/api'
+  prod: '/api'
 }
 
 // 判断当前环境
