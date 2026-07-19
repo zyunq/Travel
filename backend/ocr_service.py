@@ -12,6 +12,12 @@
 """
 
 import sys
+sys.setrecursionlimit(10000)  # 增加递归深度限制，解决 PaddleOCR 递归超限问题
+
+# 同时增加 PIL 的递归限制
+import PIL.Image
+PIL.Image.MAX_IMAGE_PIXELS = None
+
 import os
 import json
 import tempfile
@@ -52,7 +58,8 @@ def recognize_single(image_path, doc_type=None):
             "passport": PassportParser(),
         }
 
-        ocr_result, debug_info = ocr_engine.recognize(image_path)
+        # 使用安全识别方法（带预处理和自动重试）
+        ocr_result, debug_info = ocr_engine.recognize_safe(image_path)
 
         if not ocr_result:
             return {
@@ -82,7 +89,8 @@ def recognize_single(image_path, doc_type=None):
             "debug": {
                 "text_count": debug_info.get("text_count", 0),
                 "avg_confidence": debug_info.get("avg_confidence", 0),
-                "raw_texts": debug_info.get("raw_texts", [])[:10]  # 只返回前10条
+                "raw_texts": debug_info.get("raw_texts", [])[:10],  # 只返回前10条
+                "retried": debug_info.get("retried", False)
             }
         }
 
@@ -123,7 +131,8 @@ def recognize_batch(zip_path):
                 if ext in image_extensions:
                     image_count += 1
                     try:
-                        ocr_result, debug_info = ocr_engine.recognize(file_path)
+                        # 使用安全识别方法（带预处理和自动重试）
+                        ocr_result, debug_info = ocr_engine.recognize_safe(file_path)
 
                         if ocr_result:
                             doc_type = detect_document_type(ocr_result)

@@ -36,11 +36,11 @@ class OCREngine:
             return
 
         logger.info(f"初始化 OCR 引擎: lang={lang}, use_gpu={use_gpu}")
+        import logging
+        logging.getLogger('ppocr').setLevel(logging.ERROR)
         self.ocr = PaddleOCR(
             use_angle_cls=True,
-            lang=lang,
-            use_gpu=use_gpu,
-            show_log=False
+            lang=lang
         )
         self._initialized = True
 
@@ -104,6 +104,76 @@ class OCREngine:
             debug_info["error"] = str(e)
             logger.error(f"[OCR] {image_path} - 识别异常: {e}")
             return [], debug_info
+
+    def recognize_safe(self, image_path: str, max_retries: int = 1) -> Tuple[List[Dict], Dict]:
+        """
+        安全识别，带预处理和自动重试
+
+        Args:
+            image_path: 图片路径
+            max_retries: 最大重试次数
+
+        Returns:
+            (识别结果列表, 调试信息)
+        """
+        from ocr.preprocess import standardize_image
+
+        debug_info = {
+            "image_path": image_path,
+            "ocr_success": False,
+            "text_count": 0,
+            "avg_confidence": 0,
+            "raw_texts": [],
+            "error": None,
+            "retried": False
+        }
+
+        # 第一次尝试：预处理后识别
+        try:
+            processed_path = standardize_image(image_path)
+            lines, info = self.recognize(processed_path)
+
+            if lines:
+                return lines, {**debug_info, **info, "ocr_success": True}
+
+            # 没有识别到文字，记录原因
+            debug_info["error"] = info.get("error", "未检测到文字")
+
+        except RecursionError as e:
+            debug_info["error"] = f"递归深度超限: {str(e)[:100]}"
+        except Exception as e:
+            debug_info["error"] = str(e)[:200]
+
+        # 重试：直接识别原图（跳过预处理，不使用角度分类）
+        if max_retries > 0:
+            debug_info["retried"] = True
+            try:
+                # 重试时不使用角度分类，减少递归深度
+                result = self.ocr.ocr(image_path, cls=False)
+                if result and result[0]:
+                    lines = []
+                    total_confidence = 0
+                    for line in result[0]:
+                        text = line[1][0]
+                        confidence = line[1][1]
+                        position = line[0]
+                        lines.append({
+                            "text": text,
+                            "confidence": confidence,
+                            "position": position
+                        })
+                        debug_info["raw_texts"].append(text)
+                        total_confidence += confidence
+                    debug_info["ocr_success"] = True
+                    debug_info["text_count"] = len(lines)
+                    debug_info["avg_confidence"] = round(total_confidence / len(lines), 3) if lines else 0
+                    return lines, debug_info
+            except RecursionError as e:
+                debug_info["error"] = f"重试后仍递归超限: {str(e)[:100]}"
+            except Exception as e:
+                debug_info["error"] = f"重试失败: {str(e)[:200]}"
+
+        return [], debug_info
 
     def recognize_with_debug(self, image_path: str) -> Dict:
         """

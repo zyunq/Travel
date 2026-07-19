@@ -13,8 +13,8 @@ const upload = multer({ dest: 'uploads/' });
 
 // OCR 服务脚本路径
 const OCR_SCRIPT = path.join(__dirname, '../ocr_service.py');
-// Python 路径（使用系统 64 位 Python，已安装 paddleocr）
-const PYTHON_PATH = 'python3';
+// Python 路径（优先使用环境变量，默认 python3）
+const PYTHON_PATH = process.env.PYTHON_PATH || 'python3';
 
 /**
  * 调用 Python OCR 服务
