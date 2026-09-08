@@ -280,11 +280,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed } from 'vue'
+import { onLoad } from '@dcloudio/uni-app'
 import { BASE_URL } from '@/config'
+import {
+  parseTripId,
+  requestAddMember,
+  requestGroupDetail
+} from '@/utils/group-detail.mjs'
 
 const groupInfo = ref({})
 const members = ref([])
+const currentTripId = ref(null)
 const showAddMember = ref(false)
 const searchKeyword = ref('')
 
@@ -352,37 +359,32 @@ const onTicketTypeChange = (e) => {
 }
 
 const loadDetail = async () => {
-  const pages = getCurrentPages()
-  const currentPage = pages[pages.length - 1]
-  const tripId = currentPage.options.id
+  const tripId = currentTripId.value
 
   if (!tripId) {
-    uni.showToast({ title: '参数错误', icon: 'none' })
+    uni.showToast({ title: '行程参数错误', icon: 'none' })
     return
   }
 
   uni.showLoading({ title: '加载中...' })
 
   try {
-    const trip = await new Promise((resolve, reject) => {
-      uni.request({
-        url: BASE_URL + '/groups/' + tripId,
-        success: (r) => resolve(r.data),
-        fail: reject
-      })
+    const trip = await requestGroupDetail({
+      request: uni.request,
+      baseUrl: BASE_URL,
+      tripId
     })
 
     groupInfo.value = trip
 
-    if (trip.members) {
-      members.value = trip.members
-    }
+    members.value = Array.isArray(trip.members) ? trip.members : []
 
     if (trip.summary) {
       Object.assign(summary, trip.summary)
     }
   } catch (e) {
-    uni.showToast({ title: '加载失败', icon: 'none' })
+    console.error('加载团详情失败:', e)
+    uni.showToast({ title: e.message || '加载失败', icon: 'none' })
   } finally {
     uni.hideLoading()
   }
@@ -395,37 +397,33 @@ const addMember = async () => {
   }
 
   try {
-    await new Promise((resolve, reject) => {
-      uni.request({
-        url: BASE_URL + '/members',
-        method: 'POST',
-        data: {
-          groupId: groupInfo.value.id,
-          ...newMember,
-          date: groupInfo.value.departDate,
-          trainNo: groupInfo.value.trainNo,
-          departStation: groupInfo.value.route?.split('-')[0] || '',
-          arriveStation: groupInfo.value.route?.split('-')[1] || '',
-          seatClass: '二等座',
-          orderNo: ''
-        },
-        success: (r) => resolve(r.data),
-        fail: reject
-      })
+    await requestAddMember({
+      request: uni.request,
+      baseUrl: BASE_URL,
+      tripId: groupInfo.value.id,
+      member: {
+        ...newMember,
+        date: groupInfo.value.departDate,
+        trainNo: groupInfo.value.trainNo,
+        departStation: groupInfo.value.route?.split('-')[0] || '',
+        arriveStation: groupInfo.value.route?.split('-')[1] || '',
+        seatClass: '二等座',
+        orderNo: ''
+      }
     })
 
-    uni.showToast({ title: '添加成功', icon: 'success' })
-    showAddMember.value = false
+    await loadDetail()
 
+    showAddMember.value = false
     newMember.name = ''
     newMember.idNumber = ''
     newMember.carriage = ''
     newMember.seatNo = ''
     newMember.price = ''
 
-    loadDetail()
+    uni.showToast({ title: '添加成功', icon: 'success' })
   } catch (e) {
-    uni.showToast({ title: '添加失败', icon: 'none' })
+    uni.showToast({ title: e.message || '添加失败', icon: 'none' })
   }
 }
 
@@ -581,7 +579,35 @@ const copyInfo = async () => {
   }
 }
 
-onMounted(loadDetail)
+// 检查登录状态
+const checkLoginStatus = () => {
+  const userInfo = uni.getStorageSync('user')
+  if (!userInfo) {
+    console.log('未登录，跳转到登录页')
+    uni.reLaunch({
+      url: '/pages/login/login'
+    })
+    return false
+  }
+  return true
+}
+
+onLoad((options) => {
+  // 先检查登录状态
+  if (!checkLoginStatus()) {
+    return
+  }
+
+  const tripId = parseTripId(options)
+
+  if (!tripId) {
+    uni.showToast({ title: '行程参数错误', icon: 'none' })
+    return
+  }
+
+  currentTripId.value = tripId
+  loadDetail()
+})
 </script>
 
 <style scoped>

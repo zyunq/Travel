@@ -5,6 +5,7 @@ const prisma = require('../prisma/client');
 const { parseExcel } = require('../utils/excelParser');
 const { determineTicketType } = require('../utils/ticketType');
 const { generateTemplate } = require('../utils/templateGenerator');
+const { normalizeMemberPrice } = require('../utils/memberPayload');
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -32,14 +33,19 @@ router.post('/groups/:groupId/members', async (req, res) => {
     const { groupId } = req.params;
     const group = await prisma.group.findUnique({ where: { id: parseInt(groupId) } });
 
+    if (!group) {
+      return res.status(404).json({ error: '行程不存在' });
+    }
+
     console.log('收到新增成员请求:', req.body);
 
-    const { idType, name, idNumber, date, trainNo, departStation, arriveStation, seatClass, carriage, seatNo, price, orderNo, ticketType: inputTicketType } = req.body;
+    const { idType, name, idNumber, date, trainNo, departStation, arriveStation, seatClass, carriage, seatNo, price: inputPrice, orderNo, ticketType: inputTicketType } = req.body;
+    const price = normalizeMemberPrice(inputPrice);
 
     // 优先使用前端传来的票型，否则自动判断
     let ticketType = inputTicketType;
     if (!ticketType) {
-      ticketType = determineTicketType(idType, idNumber, price, group.adultPrice);
+      ticketType = determineTicketType(price, group.adultPrice);
     }
 
     console.log('票型:', ticketType, '前端传入:', inputTicketType);
@@ -57,7 +63,7 @@ router.post('/groups/:groupId/members', async (req, res) => {
         seatClass: seatClass || '二等座',
         carriage: carriage || '',
         seatNo: seatNo || '',
-        price: price || 0,
+        price,
         orderNo: orderNo || '',
         ticketType,
         status: '正常'
@@ -77,7 +83,7 @@ router.post('/groups/:groupId/members', async (req, res) => {
     res.json(member);
   } catch (error) {
     console.error('新增成员失败:', error);
-    res.status(500).json({ error: error.message });
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
