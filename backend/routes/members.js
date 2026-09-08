@@ -6,7 +6,7 @@ const { parseExcel } = require('../utils/excelParser');
 const { determineTicketType } = require('../utils/ticketType');
 const { generateTemplate } = require('../utils/templateGenerator');
 const { normalizeMemberPrice } = require('../utils/memberPayload');
-const { appendGroupNote } = require('../utils/groupNotes');
+const { appendGroupNote, appendGroupNotes } = require('../utils/groupNotes');
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -51,17 +51,22 @@ router.post('/groups/:groupId/members', async (req, res) => {
 
     console.log('票型:', ticketType, '前端传入:', inputTicketType);
 
-    const [member] = await prisma.$transaction([
-      prisma.member.create({
+    const member = await prisma.$transaction(async (tx) => {
+      const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+      if (!currentGroup) {
+        throw Object.assign(new Error('行程不存在'), { status: 404 });
+      }
+
+      const createdMember = await tx.member.create({
         data: {
           groupId: parseInt(groupId),
           idType: idType || '二代',
           name,
           idNumber,
-          date: date || group.departDate,
-          trainNo: trainNo || group.trainNo || '',
-          departStation: departStation || group.route?.split('-')[0] || '',
-          arriveStation: arriveStation || group.route?.split('-')[1] || '',
+          date: date || currentGroup.departDate,
+          trainNo: trainNo || currentGroup.trainNo || '',
+          departStation: departStation || currentGroup.route?.split('-')[0] || '',
+          arriveStation: arriveStation || currentGroup.route?.split('-')[1] || '',
           seatClass: seatClass || '二等座',
           carriage: carriage || '',
           seatNo: seatNo || '',
@@ -70,15 +75,18 @@ router.post('/groups/:groupId/members', async (req, res) => {
           ticketType,
           status: '正常'
         }
-      }),
-      prisma.group.update({
+      });
+
+      await tx.group.update({
         where: { id: parseInt(groupId) },
         data: {
           serviceFeeCount: { increment: 1 },
-          notes: appendGroupNote(group.notes, 'add', name, price)
+          notes: appendGroupNote(currentGroup.notes, 'add', name, price)
         }
-      })
-    ]);
+      });
+
+      return createdMember;
+    });
 
     console.log('创建成员成功:', member.id);
 
@@ -100,20 +108,30 @@ router.post('/groups/:groupId/members/import', upload.single('file'), async (req
     return res.status(400).json({ error: '请上传文件' });
   }
 
+  if (!group) {
+    return res.status(404).json({ error: '行程不存在' });
+  }
+
   const result = parseExcel(req.file.path, group.adultPrice);
   const members = result.members;
 
-  const importResult = await prisma.member.createMany({
-    data: members.map(m => ({
-      ...m,
-      groupId: parseInt(groupId)
-    }))
-  });
+  const importResult = await prisma.$transaction(async (tx) => {
+    const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+    if (!currentGroup) throw Object.assign(new Error('行程不存在'), { status: 404 });
 
-  // 购票张数增加
-  await prisma.group.update({
-    where: { id: parseInt(groupId) },
-    data: { serviceFeeCount: { increment: importResult.count } }
+    const created = await tx.member.createMany({
+      data: members.map(m => ({ ...m, groupId: parseInt(groupId) }))
+    });
+    await tx.group.update({
+      where: { id: parseInt(groupId) },
+      data: {
+        serviceFeeCount: { increment: created.count },
+        notes: appendGroupNotes(currentGroup.notes, members.map(m => ({
+          action: 'add', name: m.name, price: m.price
+        })))
+      }
+    });
+    return created;
   });
 
   res.json({ imported: importResult.count });
@@ -150,29 +168,25 @@ router.delete('/members/:id', async (req, res) => {
 router.put('/members/:id/refund', async (req, res) => {
   try {
     const { id } = req.params;
-    const member = await prisma.member.findUnique({ where: { id: parseInt(id) } });
-    if (!member) {
-      return res.status(404).json({ error: '乘客不存在' });
-    }
-    if (member.status === '退票') {
-      return res.json(member);
-    }
-    const group = await prisma.group.findUnique({ where: { id: member.groupId } });
-    if (!group) {
-      return res.status(404).json({ error: '行程不存在' });
-    }
+    const result = await prisma.$transaction(async (tx) => {
+      const member = await tx.member.findUnique({ where: { id: parseInt(id) } });
+      if (!member) throw Object.assign(new Error('乘客不存在'), { status: 404 });
+      if (member.status === '退票') return member;
 
-    const [updatedMember] = await prisma.$transaction([
-      prisma.member.update({
+      const group = await tx.group.findUnique({ where: { id: member.groupId } });
+      if (!group) throw Object.assign(new Error('行程不存在'), { status: 404 });
+
+      const updatedMember = await tx.member.update({
         where: { id: parseInt(id) },
         data: { status: '退票' }
-      }),
-      prisma.group.update({
+      });
+      await tx.group.update({
         where: { id: member.groupId },
         data: { notes: appendGroupNote(group.notes, 'refund', member.name, member.price) }
-      })
-    ]);
-    res.json(updatedMember);
+      });
+      return updatedMember;
+    });
+    res.json(result);
   } catch (error) {
     console.error('退票失败:', error);
     res.status(500).json({ error: error.message });

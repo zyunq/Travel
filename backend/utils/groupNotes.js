@@ -6,4 +6,11 @@ function appendGroupNote(existing, action, name, price) {
   return previous ? `${previous}\n${label}` : label
 }
 
-module.exports = { appendGroupNote }
+function appendGroupNotes(existing, entries) {
+  return entries.reduce(
+    (notes, entry) => appendGroupNote(notes, entry.action, entry.name, entry.price),
+    existing
+  )
+}
+
+module.exports = { appendGroupNote, appendGroupNotes }

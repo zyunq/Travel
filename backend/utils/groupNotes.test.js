@@ -1,7 +1,7 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-const { appendGroupNote } = require('./groupNotes')
+const { appendGroupNote, appendGroupNotes } = require('./groupNotes')
 
 test('appendGroupNote appends an add record to an existing note', () => {
   assert.equal(
@@ -21,5 +21,15 @@ test('appendGroupNote trims blank notes and formats decimal prices', () => {
   assert.equal(
     appendGroupNote('  ', 'add', '李四', 82.5),
     '新增：李四，票价：82.5元'
+  )
+})
+
+test('appendGroupNotes records every imported passenger', () => {
+  assert.equal(
+    appendGroupNotes('', [
+      { action: 'add', name: '张三', price: 164 },
+      { action: 'add', name: '李四', price: 82 }
+    ]),
+    '新增：张三，票价：164元\n新增：李四，票价：82元'
   )
 })
