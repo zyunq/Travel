@@ -93,6 +93,20 @@
       </view>
     </view>
 
+    <!-- 行程备注 -->
+    <view class="notes-card">
+      <view class="notes-header">
+        <text class="notes-title">📝 行程备注（记账）</text>
+        <button class="notes-save" size="mini" @tap="updateNotes">保存</button>
+      </view>
+      <textarea
+        class="notes-input"
+        v-model="groupInfo.notes"
+        maxlength="2000"
+        placeholder="新增或退票后会自动记录，也可以手动补充"
+      />
+    </view>
+
     <!-- 快捷操作 -->
     <view class="quick-actions">
       <view class="action-btn" @tap="showAddMember = true">
@@ -511,6 +525,28 @@ const updateVerifyCount = async () => {
   }
 }
 
+const updateNotes = async () => {
+  if (!groupInfo.value.id) return
+
+  try {
+    await new Promise((resolve, reject) => {
+      uni.request({
+        url: BASE_URL + '/groups/' + groupInfo.value.id,
+        method: 'PUT',
+        data: { notes: groupInfo.value.notes || '' },
+        success: (r) => {
+          if (r.statusCode >= 200 && r.statusCode < 300) resolve(r.data)
+          else reject(new Error(r.data?.error || '保存失败'))
+        },
+        fail: reject
+      })
+    })
+    uni.showToast({ title: '备注已保存', icon: 'success' })
+  } catch (e) {
+    uni.showToast({ title: e.message || '保存失败', icon: 'none' })
+  }
+}
+
 const exportSeats = async () => {
   if (!groupInfo.value.id) {
     uni.showToast({ title: '数据未加载', icon: 'none' })
@@ -785,6 +821,50 @@ onLoad((options) => {
   border-radius: 24rpx;
   padding: 28rpx;
   box-shadow: 0 8px 32px rgba(13, 148, 136, 0.08);
+}
+
+.notes-card {
+  background: #fff;
+  margin: 24rpx 24rpx 0;
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 8px 32px rgba(13, 148, 136, 0.08);
+}
+
+.notes-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16rpx;
+}
+
+.notes-title {
+  font-size: 30rpx;
+  font-weight: 700;
+  color: #1f2937;
+}
+
+.notes-save {
+  margin: 0;
+  color: #0d9488;
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+}
+
+.notes-save::after {
+  border: none;
+}
+
+.notes-input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 180rpx;
+  padding: 18rpx;
+  border: 1px solid #d1d5db;
+  border-radius: 14rpx;
+  background: #f9fafb;
+  font-size: 26rpx;
+  line-height: 1.6;
 }
 
 .fee-header {

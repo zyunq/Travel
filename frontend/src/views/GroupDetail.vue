@@ -65,6 +65,19 @@
                 </div>
               </div>
 
+              <div class="trip-notes">
+                <div class="notes-header">
+                  <span>备注（记账）</span>
+                  <el-button type="primary" link size="small" @click="saveNotes(trip)">保存备注</el-button>
+                </div>
+                <el-input
+                  v-model="trip.notes"
+                  type="textarea"
+                  :rows="4"
+                  placeholder="新增或退票后会自动记录，也可以手动补充"
+                />
+              </div>
+
               <!-- 人员列表 -->
               <div class="members-section">
                 <div class="members-header">
@@ -340,6 +353,7 @@ const copyTotalInfo = async () => {
     text += `购票服务费：${trip.summary.serviceFee}元\n`
     text += `退票服务费：${trip.summary.refundFee}元\n`
     text += `核验费：${trip.summary.verifyFee}元\n`
+    text += `备注：${trip.notes || '无'}\n`
     text += `小计：${trip.summary.total}元\n\n`
   }
 
@@ -450,6 +464,11 @@ const saveTrip = async () => {
   ElMessage.success('保存成功')
   showEditTripDialog.value = false
   loadData()
+}
+
+const saveNotes = async (trip) => {
+  await groupApi.update(trip.id, { notes: trip.notes || '' })
+  ElMessage.success('备注已保存')
 }
 
 const showAddMember = (tripId) => {
@@ -580,6 +599,20 @@ onMounted(loadData)
 
 .trip-summary {
   font-size: 15px;
+}
+
+.trip-notes {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #ebeef5;
+}
+
+.notes-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+  font-weight: 600;
 }
 
 .summary-row {

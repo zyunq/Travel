@@ -6,6 +6,7 @@ const { parseExcel } = require('../utils/excelParser');
 const { determineTicketType } = require('../utils/ticketType');
 const { generateTemplate } = require('../utils/templateGenerator');
 const { normalizeMemberPrice } = require('../utils/memberPayload');
+const { appendGroupNote } = require('../utils/groupNotes');
 
 const upload = multer({ dest: 'uploads/' });
 
@@ -50,35 +51,38 @@ router.post('/groups/:groupId/members', async (req, res) => {
 
     console.log('票型:', ticketType, '前端传入:', inputTicketType);
 
-    const member = await prisma.member.create({
-      data: {
-        groupId: parseInt(groupId),
-        idType: idType || '二代',
-        name,
-        idNumber,
-        date: date || group.departDate,
-        trainNo: trainNo || group.trainNo || '',
-        departStation: departStation || group.route?.split('-')[0] || '',
-        arriveStation: arriveStation || group.route?.split('-')[1] || '',
-        seatClass: seatClass || '二等座',
-        carriage: carriage || '',
-        seatNo: seatNo || '',
-        price,
-        orderNo: orderNo || '',
-        ticketType,
-        status: '正常'
-      }
-    });
+    const [member] = await prisma.$transaction([
+      prisma.member.create({
+        data: {
+          groupId: parseInt(groupId),
+          idType: idType || '二代',
+          name,
+          idNumber,
+          date: date || group.departDate,
+          trainNo: trainNo || group.trainNo || '',
+          departStation: departStation || group.route?.split('-')[0] || '',
+          arriveStation: arriveStation || group.route?.split('-')[1] || '',
+          seatClass: seatClass || '二等座',
+          carriage: carriage || '',
+          seatNo: seatNo || '',
+          price,
+          orderNo: orderNo || '',
+          ticketType,
+          status: '正常'
+        }
+      }),
+      prisma.group.update({
+        where: { id: parseInt(groupId) },
+        data: {
+          serviceFeeCount: { increment: 1 },
+          notes: appendGroupNote(group.notes, 'add', name, price)
+        }
+      })
+    ]);
 
     console.log('创建成员成功:', member.id);
 
-    // 购票张数 +1
-    await prisma.group.update({
-      where: { id: parseInt(groupId) },
-      data: { serviceFeeCount: { increment: 1 } }
-    });
-
-    console.log('更新购票张数成功');
+    console.log('更新购票张数和备注成功');
 
     res.json(member);
   } catch (error) {
@@ -144,12 +148,35 @@ router.delete('/members/:id', async (req, res) => {
 
 // 人员退票
 router.put('/members/:id/refund', async (req, res) => {
-  const { id } = req.params;
-  const member = await prisma.member.update({
-    where: { id: parseInt(id) },
-    data: { status: '退票' }
-  });
-  res.json(member);
+  try {
+    const { id } = req.params;
+    const member = await prisma.member.findUnique({ where: { id: parseInt(id) } });
+    if (!member) {
+      return res.status(404).json({ error: '乘客不存在' });
+    }
+    if (member.status === '退票') {
+      return res.json(member);
+    }
+    const group = await prisma.group.findUnique({ where: { id: member.groupId } });
+    if (!group) {
+      return res.status(404).json({ error: '行程不存在' });
+    }
+
+    const [updatedMember] = await prisma.$transaction([
+      prisma.member.update({
+        where: { id: parseInt(id) },
+        data: { status: '退票' }
+      }),
+      prisma.group.update({
+        where: { id: member.groupId },
+        data: { notes: appendGroupNote(group.notes, 'refund', member.name, member.price) }
+      })
+    ]);
+    res.json(updatedMember);
+  } catch (error) {
+    console.error('退票失败:', error);
+    res.status(500).json({ error: error.message });
+  }
 });
 
 module.exports = router;

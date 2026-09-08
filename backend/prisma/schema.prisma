@@ -20,6 +20,7 @@ model Group {
   childPrice      Float
   verifyCount     Int      @default(0)
   serviceFeeCount Int      @default(0)  // 累计购票张数（只增不减）
+  notes           String   @default("")
   members         Member[]
 }
 

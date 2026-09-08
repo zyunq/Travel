@@ -153,10 +153,10 @@ router.get('/:id', async (req, res) => {
 // 编辑旅游团
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
-  const { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount } = req.body;
+  const { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount, notes } = req.body;
   const group = await prisma.group.update({
     where: { id: parseInt(id) },
-    data: { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount }
+    data: { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount, ...(notes !== undefined ? { notes } : {}) }
   });
   res.json(group);
 });
@@ -207,6 +207,8 @@ router.get('/:id/copy', async (req, res) => {
 购票服务费：${serviceFeeCount}张 × ${config?.serviceFee || 10}元 = ${serviceFee}元
 退票服务费：${refundCount}张 × ${config?.refundServiceFee || 20}元 = ${refundFee}元
 核验费：${group.verifyCount}次 × ${config?.foreignIdVerify || 8}元 = ${verifyFee}元
+备注：
+${group.notes || '无'}
 ────────────────────
 共计：${ticketTotal} + ${serviceFee} + ${refundFee} + ${verifyFee} = ${total}元`;
 
