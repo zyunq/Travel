@@ -45,3 +45,34 @@ export const requestAddMember = ({ request, baseUrl, tripId, member }) => {
     })
   })
 }
+
+export const requestDeleteGroup = ({ request, baseUrl, tripId }) => {
+  return new Promise((resolve, reject) => {
+    request({
+      url: `${baseUrl}/groups/${tripId}`,
+      method: 'DELETE',
+      success: (response) => {
+        if (response.statusCode >= 200 && response.statusCode < 300) {
+          resolve(response.data)
+          return
+        }
+
+        const message = response.data?.error || `请求失败：${response.statusCode}`
+        reject(new Error(message))
+      },
+      fail: reject
+    })
+  })
+}
+
+export const buildDeleteTripConfirmation = ({
+  groupName,
+  tripType,
+  trainNo,
+  memberCount
+}) => {
+  const tripName = groupName || '当前旅游团'
+  const direction = tripType || '当前行程'
+  const train = trainNo ? `（${trainNo}）` : ''
+  return `确定删除“${tripName}”的${direction}${train}吗？该行程及其 ${memberCount} 名乘客将被永久删除，此操作无法撤销。`
+}

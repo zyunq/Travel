@@ -127,6 +127,12 @@
         </view>
         <text class="action-text">复制信息</text>
       </view>
+      <view class="action-btn danger" :class="{ disabled: deletingTrip }" @tap="deleteTrip">
+        <view class="action-icon delete-trip">
+          <text>🗑️</text>
+        </view>
+        <text class="action-text danger-text">{{ deletingTrip ? '删除中' : '删除行程' }}</text>
+      </view>
     </view>
 
     <!-- 乘客列表 -->
@@ -298,8 +304,10 @@ import { ref, reactive, computed } from 'vue'
 import { onLoad } from '@dcloudio/uni-app'
 import { BASE_URL } from '@/config'
 import {
+  buildDeleteTripConfirmation,
   parseTripId,
   requestAddMember,
+  requestDeleteGroup,
   requestGroupDetail
 } from '@/utils/group-detail.mjs'
 
@@ -308,6 +316,7 @@ const members = ref([])
 const currentTripId = ref(null)
 const showAddMember = ref(false)
 const searchKeyword = ref('')
+const deletingTrip = ref(false)
 
 const summary = reactive({
   adultCount: 0,
@@ -488,6 +497,48 @@ const deleteMember = async (member) => {
     loadDetail()
   } catch (e) {
     uni.showToast({ title: '删除失败', icon: 'none' })
+  }
+}
+
+const deleteTrip = async () => {
+  if (!groupInfo.value.id || deletingTrip.value) return
+
+  deletingTrip.value = true
+  let loadingVisible = false
+
+  try {
+    const res = await uni.showModal({
+      title: '删除整个行程',
+      content: buildDeleteTripConfirmation({
+        groupName: groupInfo.value.groupName,
+        tripType: groupInfo.value.tripType,
+        trainNo: groupInfo.value.trainNo,
+        memberCount: members.value.length
+      }),
+      confirmText: '删除',
+      confirmColor: '#dc2626'
+    })
+
+    if (!res.confirm) return
+
+    uni.showLoading({ title: '删除中...', mask: true })
+    loadingVisible = true
+
+    await requestDeleteGroup({
+      request: uni.request,
+      baseUrl: BASE_URL,
+      tripId: groupInfo.value.id
+    })
+
+    uni.hideLoading()
+    loadingVisible = false
+    uni.showToast({ title: '行程已删除', icon: 'success' })
+    uni.reLaunch({ url: '/pages/index/index' })
+  } catch (e) {
+    if (loadingVisible) uni.hideLoading()
+    uni.showToast({ title: e.message || '删除失败', icon: 'none' })
+  } finally {
+    deletingTrip.value = false
   }
 }
 
@@ -946,6 +997,14 @@ onLoad((options) => {
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
 }
 
+.action-btn.danger {
+  border: 1px solid #fecaca;
+}
+
+.action-btn.disabled {
+  opacity: 0.55;
+}
+
 .action-icon {
   width: 56rpx;
   height: 56rpx;
@@ -968,10 +1027,18 @@ onLoad((options) => {
   background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
 }
 
+.action-icon.delete-trip {
+  background: #fee2e2;
+}
+
 .action-text {
   font-size: 24rpx;
   color: #4b5563;
   font-weight: 500;
+}
+
+.action-text.danger-text {
+  color: #b91c1c;
 }
 
 /* 乘客列表 */

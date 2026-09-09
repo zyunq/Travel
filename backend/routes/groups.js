@@ -161,12 +161,18 @@ router.put('/:id', async (req, res) => {
   res.json(group);
 });
 
+const createDeleteGroupHandler = (db) => async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    await db.group.delete({ where: { id: parseInt(id) } });
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // 删除旅游团
-router.delete('/:id', async (req, res) => {
-  const { id } = req.params;
-  await prisma.group.delete({ where: { id: parseInt(id) } });
-  res.json({ success: true });
-});
+router.delete('/:id', createDeleteGroupHandler(prisma));
 
 // 复制团信息
 router.get('/:id/copy', async (req, res) => {
@@ -407,3 +413,4 @@ router.get('/:id/seats', async (req, res) => {
 });
 
 module.exports = router;
+module.exports.createDeleteGroupHandler = createDeleteGroupHandler;

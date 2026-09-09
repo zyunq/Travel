@@ -99,3 +99,52 @@ test('requestAddMember rejects non-success HTTP responses', async () => {
     /新增成员失败/
   )
 })
+
+test('requestDeleteGroup deletes only the selected trip', async () => {
+  const request = (options) => {
+    assert.equal(
+      options.url,
+      'https://api.zyqing.xyz/api/groups/20'
+    )
+    assert.equal(options.method, 'DELETE')
+    options.success({
+      statusCode: 200,
+      data: { success: true }
+    })
+  }
+
+  const result = await groupDetail.requestDeleteGroup({
+    request,
+    baseUrl: 'https://api.zyqing.xyz/api',
+    tripId: 20
+  })
+
+  assert.deepEqual(result, { success: true })
+})
+
+test('requestDeleteGroup exposes a failed deletion response', async () => {
+  const request = (options) => {
+    options.success({ statusCode: 500, data: { error: '删除行程失败' } })
+  }
+
+  await assert.rejects(
+    groupDetail.requestDeleteGroup({
+      request,
+      baseUrl: 'https://api.zyqing.xyz/api',
+      tripId: 20
+    }),
+    /删除行程失败/
+  )
+})
+
+test('buildDeleteTripConfirmation identifies the exact destructive target', () => {
+  assert.equal(
+    groupDetail.buildDeleteTripConfirmation({
+      groupName: '长沙团',
+      tripType: '去程',
+      trainNo: 'G123',
+      memberCount: 8
+    }),
+    '确定删除“长沙团”的去程（G123）吗？该行程及其 8 名乘客将被永久删除，此操作无法撤销。'
+  )
+})
