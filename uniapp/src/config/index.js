@@ -5,9 +5,9 @@
 // API 基础地址配置
 const API_CONFIG = {
   // 开发环境
-  dev: 'http://localhost:3000/api',
+  dev: 'https://api.zyqing.xyz/api',
   // 生产环境
-  prod: 'http://101.34.71.12/api'
+  prod: 'https://api.zyqing.xyz/api'
 }
 
 // 判断当前环境（小程序环境判断）

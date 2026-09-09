@@ -73,6 +73,12 @@
         <text class="btn-icon">✏️</text>
         <text class="btn-text">Edit Config</text>
       </button>
+
+      <!-- Logout Button -->
+      <button class="logout-btn" @tap="handleLogout">
+        <text class="btn-icon">🚪</text>
+        <text class="btn-text">退出登录</text>
+      </button>
     </view>
 
     <!-- Edit Popup -->
@@ -138,6 +144,7 @@
 
 <script>
 import { configApi } from '@/utils/api'
+import { useUserStore } from '@/stores/user'
 import CustomTabbar from '@/components/CustomTabbar.vue'
 
 export default {
@@ -163,9 +170,25 @@ export default {
     }
   },
   onLoad() {
+    if (!this.checkLoginStatus()) return
     this.loadConfig()
   },
+  onShow() {
+    this.checkLoginStatus()
+  },
   methods: {
+    checkLoginStatus() {
+      const userInfo = uni.getStorageSync('user')
+      console.log('配置页检查登录状态:', userInfo)
+      if (!userInfo) {
+        console.log('未登录，强制跳转到登录页')
+        uni.reLaunch({
+          url: '/pages/login/login'
+        })
+        return false
+      }
+      return true
+    },
     async loadConfig() {
       try {
         const res = await configApi.get()
@@ -192,6 +215,22 @@ export default {
       } finally {
         this.loading = false
       }
+    },
+    handleLogout() {
+      uni.showModal({
+        title: '提示',
+        content: '确定要退出登录吗？',
+        success: (res) => {
+          if (res.confirm) {
+            const userStore = useUserStore()
+            userStore.logout()
+            uni.reLaunch({
+              url: '/pages/login/login'
+            })
+            uni.showToast({ title: '已退出登录', icon: 'success' })
+          }
+        }
+      })
     }
   }
 }
@@ -309,6 +348,23 @@ export default {
 }
 
 .edit-btn::after {
+  border: none;
+}
+
+.logout-btn {
+  width: 100%;
+  height: 100rpx;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border-radius: 20rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12rpx;
+  margin-top: 24rpx;
+  border: none;
+}
+
+.logout-btn::after {
   border: none;
 }
 

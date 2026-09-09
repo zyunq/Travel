@@ -26,14 +26,16 @@
   },
   "quickapp": {},
   "mp-weixin": {
-    "appid": "",
+    "appid": "wx42e86a2134e6d842",
     "setting": {
       "urlCheck": false,
       "es6": true,
       "minified": true
     },
     "usingComponents": true,
-    "requiredPrivateInfos": ["chooseAddress", "getLocation"]
+    "optimization": {
+      "subPackages": true
+    }
   },
   "mp-alipay": {
     "usingComponents": true

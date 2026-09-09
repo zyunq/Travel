@@ -195,7 +195,21 @@
 
           <button class="submit-btn" @tap="chooseFile">
             <text class="btn-icon">📄</text>
-            <text class="btn-text">Select Excel File</text>
+            <text class="btn-text">从聊天中选择 Excel</text>
+          </button>
+
+          <view class="import-tip">
+            <text class="tip-icon">⚠️</text>
+            <text class="tip-text">重要提示：\n\n开发者工具可能无法显示聊天文件！\n\n✅ 解决方法：\n1. 点击"真机调试"按钮\n2. 用手机扫码测试\n3. 在真实手机上选择文件\n\n📱 文件要求：\n• 必须由他人发送\n• 格式：.xlsx 或 .xls\n• 不能是文件传输助手的文件</text>
+          </view>
+
+          <view class="divider">
+            <text class="divider-text">或者</text>
+          </view>
+
+          <button class="submit-btn secondary" @tap="openWebImport">
+            <text class="btn-icon">🌐</text>
+            <text class="btn-text">网页端导入（推荐）</text>
           </button>
         </view>
       </view>
@@ -208,6 +222,7 @@
 
 <script>
 import { groupApi } from '@/utils/api'
+import { filePicker } from '@/utils/file-picker'
 import CustomTabbar from '@/components/CustomTabbar.vue'
 
 export default {
@@ -218,7 +233,7 @@ export default {
     return {
       loading: false,
       searchKeyword: '',
-      groups: [],
+      groups: [],  // 初始化为空数组
       showImport: false,
       importForm: {
         groupName: '',
@@ -261,10 +276,43 @@ export default {
     }
   },
   onLoad() {
-    console.log('Index page loaded')
+    console.log('========== INDEX PAGE ONLOAD START ==========')
+    console.log('Step 1: Index page loaded')
+    console.log('Step 2: 准备调用 checkLoginStatus')
+    console.log('Step 3: this 对象:', this)
+    console.log('Step 4: checkLoginStatus 方法存在?', typeof this.checkLoginStatus)
+
+    const userInfo = uni.getStorageSync('user')
+    console.log('Step 5: 直接获取 storage user:', userInfo)
+
+    if (!userInfo) {
+      console.log('Step 6: 没有登录信息，跳转到登录页')
+      uni.reLaunch({
+        url: '/pages/login/login'
+      })
+      return
+    }
+
+    console.log('Step 7: 已登录，继续加载数据')
     this.loadGroups()
   },
+  onShow() {
+    // 每次显示页面时也检查登录状态
+    this.checkLoginStatus()
+  },
   methods: {
+    checkLoginStatus() {
+      const userInfo = uni.getStorageSync('user')
+      console.log('检查登录状态:', userInfo)
+      if (!userInfo) {
+        console.log('未登录，强制跳转到登录页')
+        uni.reLaunch({
+          url: '/pages/login/login'
+        })
+        return false
+      }
+      return true
+    },
     getCategoryGroupCount(category) {
       const names = new Set()
       this.groups.filter(g => g.category === category).forEach(g => names.add(g.groupName))
@@ -273,8 +321,12 @@ export default {
     async loadGroups() {
       this.loading = true
       try {
-        this.groups = await groupApi.getList()
+        const data = await groupApi.getList()
+        // 确保返回的是数组
+        this.groups = Array.isArray(data) ? data : []
       } catch (e) {
+        console.error('加载数据失败:', e)
+        this.groups = []
         uni.showToast({ title: 'Load failed', icon: 'none' })
       } finally {
         this.loading = false
@@ -287,31 +339,141 @@ export default {
       uni.showToast({ title: category, icon: 'none' })
     },
     async chooseFile() {
+      console.log('=== 开始选择文件 ===')
+
       if (!this.importForm.groupName) {
-        uni.showToast({ title: 'Enter group name', icon: 'none' })
+        uni.showToast({ title: '请输入团名', icon: 'none' })
         return
       }
 
       try {
-        const res = await uni.chooseMessageFile({
-          count: 1,
-          type: 'file',
-          extension: ['.xlsx', '.xls']
-        })
+        // #ifdef MP-WEIXIN
+        console.log('微信小程序环境')
 
-        const filePath = res.tempFiles[0].path
+        uni.showLoading({ title: '选择文件...' })
+
+        // 使用智能选择策略
+        let res
+        try {
+          console.log('策略 1: 尝试不带格式限制...')
+          res = await filePicker.chooseWithoutExtension()
+        } catch (e1) {
+          console.log('策略 1 失败:', e1.errMsg || e1.message)
+
+          // 如果是用户取消，直接返回
+          if (e1.errMsg && e1.errMsg.includes('cancel')) {
+            uni.hideLoading()
+            uni.showToast({ title: '已取消', icon: 'none' })
+            return
+          }
+
+          console.log('策略 2: 尝试 uni API...')
+          try {
+            res = await filePicker.chooseWithUni()
+          } catch (e2) {
+            uni.hideLoading()
+            throw e2
+          }
+        }
+
+        console.log('文件选择结果:', res)
+
+        // 验证文件格式
+        const file = res.tempFiles[0]
+        const fileInfo = filePicker.getFileInfo(file)
+        console.log('文件信息:', fileInfo)
+
+        if (!fileInfo.isExcel) {
+          uni.hideLoading()
+          uni.showModal({
+            title: '文件格式错误',
+            content: `请选择 Excel 文件（.xlsx 或 .xls）\n\n您选择的文件：${file.name}`,
+            showCancel: false
+          })
+          return
+        }
+
+        uni.hideLoading()
+        uni.showLoading({ title: '导入中...' })
+
+        console.log('准备上传文件:', fileInfo.name, file.path)
+
         await groupApi.import({
-          filePath,
+          filePath: file.path,
           data: this.importForm
         })
 
-        uni.showToast({ title: 'Import success', icon: 'success' })
+        uni.hideLoading()
+        uni.showToast({ title: '导入成功', icon: 'success' })
         this.showImport = false
         this.importForm.groupName = ''
         this.loadGroups()
+        // #endif
+
+        // #ifdef H5
+        uni.showToast({ title: 'H5端请使用电脑端导入', icon: 'none' })
+        // #endif
       } catch (e) {
-        uni.showToast({ title: 'Import failed', icon: 'none' })
+        uni.hideLoading()
+        console.error('导入失败:', e)
+
+        if (e.errMsg && e.errMsg.includes('cancel')) {
+          uni.showToast({
+            title: '已取消选择',
+            icon: 'none',
+            duration: 1500
+          })
+          return
+        }
+
+        this.showFileSelectError(e)
       }
+    },
+
+    showFileSelectError(error) {
+      let title = '文件选择失败'
+      let content = ''
+
+      if (error.errMsg) {
+        if (error.errMsg.includes('no permission')) {
+          title = '权限不足'
+          content = '小程序需要访问聊天记录的权限。\n\n解决方法：\n1. 删除小程序\n2. 重新进入小程序\n3. 允许访问聊天记录权限'
+        } else if (error.errMsg.includes('file not found') || error.errMsg.includes('Invalid')) {
+          title = '文件不存在'
+          content = '该文件可能已被微信清理。\n\n解决方法：\n请让发送者重新发送文件。'
+        } else if (error.errMsg.includes('fail')) {
+          content = '可能的原因：\n\n'
+          content += '1. 文件不在聊天记录中\n'
+          content += '   （文件传输助手的文件无法选择）\n\n'
+          content += '2. 文件已被清理\n   （微信会定期清理历史文件）\n\n'
+          content += '3. 文件格式不对\n   （仅支持 .xlsx 和 .xls）\n\n'
+          content += '解决方法：\n请让他人将 Excel 文件发送给您，或发送到群聊中。'
+        } else {
+          content = `错误：${error.errMsg}\n\n请尝试：\n1. 重新进入小程序\n2. 使用网页端导入`
+        }
+      } else {
+        content = '未知错误，请尝试：\n\n1. 删除小程序后重新进入\n2. 使用网页端导入数据'
+      }
+
+      uni.showModal({
+        title: title,
+        content: content,
+        confirmText: '使用网页端',
+        cancelText: '取消',
+        success: (res) => {
+          if (res.confirm) {
+            this.openWebImport()
+          }
+        }
+      })
+    },
+    openWebImport() {
+      // 打开网页端导入
+      uni.showModal({
+        title: '网页端导入',
+        content: '请使用电脑浏览器访问：\n\nhttps://api.zyqing.xyz\n\n在网页端登录后导入数据',
+        showCancel: false
+      })
     }
   }
 }
@@ -865,5 +1027,49 @@ export default {
   font-size: 32rpx;
   font-weight: 600;
   color: #fff;
+}
+
+.import-tip {
+  margin-top: 24rpx;
+  padding: 20rpx;
+  background: #fef3c7;
+  border-radius: 12rpx;
+  display: flex;
+  gap: 12rpx;
+}
+
+.tip-icon {
+  font-size: 28rpx;
+  flex-shrink: 0;
+}
+
+.tip-text {
+  font-size: 24rpx;
+  color: #92400e;
+  line-height: 1.6;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  margin: 32rpx 0;
+}
+
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1rpx;
+  background: #e5e7eb;
+}
+
+.divider-text {
+  padding: 0 24rpx;
+  font-size: 24rpx;
+  color: #9ca3af;
+}
+
+.submit-btn.secondary {
+  background: linear-gradient(135deg, #6b7280 0%, #4b5563 100%);
 }
 </style>

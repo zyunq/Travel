@@ -68,6 +68,17 @@ const form = reactive({
 })
 
 onMounted(() => {
+  // 检查是否已登录
+  const userInfo = uni.getStorageSync('user')
+  if (userInfo) {
+    console.log('已登录，跳转到首页')
+    uni.switchTab({
+      url: '/pages/index/index'
+    })
+    return
+  }
+
+  // 加载记住的用户名
   const savedUsername = uni.getStorageSync('rememberedUsername')
   if (savedUsername) {
     form.username = savedUsername

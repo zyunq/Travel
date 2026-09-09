@@ -24,6 +24,12 @@
       "style": {
         "navigationBarTitleText": "Config"
       }
+    },
+    {
+      "path": "pages/test/file-test",
+      "style": {
+        "navigationBarTitleText": "文件选择测试"
+      }
     }
   ],
   "globalStyle": {
