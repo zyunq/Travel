@@ -105,10 +105,12 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok' });
 });
 
+// Auth must be mounted before the broad /api member router, whose middleware
+// protects every route under its mount path.
+app.use('/api/auth', authRouter);
 app.use('/api/config', configRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api', membersRouter);
-app.use('/api/auth', authRouter);
 app.use('/api/ocr', ocrRouter);
 
 // ============ 错误处理中间件 ============
