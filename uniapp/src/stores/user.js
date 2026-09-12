@@ -1,6 +1,16 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { BASE_URL } from '@/config'
+import { normalizeAuthResponse } from './auth-response.mjs'
+
+// Migrate the legacy shape where the complete { token, user } response was
+// stored under the `user` key and no standalone token was persisted.
+const storedUser = uni.getStorageSync('user')
+const storedToken = uni.getStorageSync('token')
+if (!storedToken && storedUser?.token && storedUser?.user) {
+  uni.setStorageSync('token', storedUser.token)
+  uni.setStorageSync('user', storedUser.user)
+}
 
 export const useUserStore = defineStore('user', () => {
   const userInfo = ref(uni.getStorageSync('user') || null)
@@ -53,8 +63,15 @@ export const useUserStore = defineStore('user', () => {
             data: { code: loginRes.code },
             success: (res) => {
               if (res.statusCode === 200) {
-                userInfo.value = res.data
-                uni.setStorageSync('user', res.data)
+                const auth = normalizeAuthResponse(res.data)
+                if (!auth.token || !auth.user) {
+                  resolve({ success: false, error: '登录响应缺少 token' })
+                  return
+                }
+                userInfo.value = auth.user
+                token.value = auth.token
+                uni.setStorageSync('user', auth.user)
+                uni.setStorageSync('token', auth.token)
                 resolve({ success: true })
               } else {
                 resolve({ success: false, error: res.data?.error || '登录失败' })
