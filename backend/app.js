@@ -96,6 +96,10 @@ const membersRouter = require('./routes/members');
 const authRouter = require('./routes/auth');
 const ocrRouter = require('./routes/ocr');
 
+// Share the auth router's Prisma client with middleware so each request
+// re-checks the current database user (including active/deactivated state).
+app.locals.prisma = authRouter.prisma;
+
 app.use('/api/config', configRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api', membersRouter);
@@ -157,7 +161,11 @@ process.on('uncaughtException', (error) => {
 });
 
 const PORT = Number(process.env.PORT) || 3000;
-app.listen(PORT, () => {
-  global.logger.info(`Server started`, { port: PORT });
-  console.log(`Server running on port ${PORT}`);
-});
+if (require.main === module) {
+  app.listen(PORT, () => {
+    global.logger.info(`Server started`, { port: PORT });
+    console.log(`Server running on port ${PORT}`);
+  });
+}
+
+module.exports = app;
