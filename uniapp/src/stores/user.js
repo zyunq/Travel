@@ -6,7 +6,7 @@ export const useUserStore = defineStore('user', () => {
   const userInfo = ref(uni.getStorageSync('user') || null)
   const token = ref(uni.getStorageSync('token') || '')
 
-  const isLoggedIn = computed(() => !!userInfo.value)
+  const isLoggedIn = computed(() => !!userInfo.value && !!token.value)
 
   const userName = computed(() => {
     return userInfo.value?.name || ''
@@ -20,9 +20,11 @@ export const useUserStore = defineStore('user', () => {
         data: { username, password },
         success: (res) => {
           if (res.statusCode === 200) {
-            userInfo.value = res.data
-            uni.setStorageSync('user', res.data)
-            resolve({ success: true })
+            userInfo.value = res.data.user
+            token.value = res.data.token
+            uni.setStorageSync('user', res.data.user)
+            uni.setStorageSync('token', res.data.token)
+            resolve({ success: true, user: res.data.user, token: res.data.token })
           } else {
             resolve({ success: false, error: res.data?.error || '登录失败' })
           }

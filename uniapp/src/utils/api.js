@@ -68,6 +68,7 @@ export const groupApi = {
         filePath: formData.filePath,
         name: 'file',
         formData: formData.data,
+        header: { Authorization: `Bearer ${uni.getStorageSync('token') || ''}` },
         success: (res) => {
           if (res.statusCode === 200) {
             resolve(JSON.parse(res.data))
@@ -94,6 +95,7 @@ export const groupApi = {
     return new Promise((resolve, reject) => {
       uni.downloadFile({
         url: BASE_URL + `/groups/${id}/seats`,
+        header: { Authorization: `Bearer ${uni.getStorageSync('token') || ''}` },
         success: (res) => {
           if (res.statusCode === 200) {
             resolve(res.tempFilePath)

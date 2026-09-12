@@ -59,8 +59,8 @@ router.post('/groups/:groupId/members', async (req, res) => {
     console.log('票型:', ticketType, '前端传入:', inputTicketType);
 
     const member = await prisma.$transaction(async (tx) => {
-      const currentGroup = await tx.group.findFirst({ where: { id: parseInt(groupId), ownerId: req.user.id } });
-      if (!currentGroup) {
+      const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+      if (!currentGroup || currentGroup.ownerId !== req.user.id) {
         throw Object.assign(new Error('行程不存在'), { status: 404 });
       }
 
@@ -123,8 +123,8 @@ router.post('/groups/:groupId/members/import', upload.single('file'), async (req
   const members = result.members;
 
   const importResult = await prisma.$transaction(async (tx) => {
-    const currentGroup = await tx.group.findFirst({ where: { id: parseInt(groupId), ownerId: req.user.id } });
-    if (!currentGroup) throw Object.assign(new Error('行程不存在'), { status: 404 });
+    const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+    if (!currentGroup || currentGroup.ownerId !== req.user.id) throw Object.assign(new Error('行程不存在'), { status: 404 });
 
     const created = await tx.member.createMany({
       data: members.map(m => ({ ...m, groupId: parseInt(groupId) }))
@@ -179,11 +179,11 @@ router.put('/members/:id/refund', async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const member = await tx.member.findUnique({ where: { id: parseInt(id) } });
       if (!member) throw Object.assign(new Error('乘客不存在'), { status: 404 });
-      const owned = await tx.group.findFirst({ where: { id: member.groupId, ownerId: req.user.id } });
-      if (!owned) throw Object.assign(new Error('乘客不存在'), { status: 404 });
+      const owned = await tx.group.findUnique({ where: { id: member.groupId } });
+      if (!owned || owned.ownerId !== req.user.id) throw Object.assign(new Error('乘客不存在'), { status: 404 });
       if (member.status === '退票') return member;
 
-      const group = await tx.group.findUnique({ where: { id: member.groupId } });
+      const group = owned;
       if (!group) throw Object.assign(new Error('行程不存在'), { status: 404 });
 
       const updatedMember = await tx.member.update({

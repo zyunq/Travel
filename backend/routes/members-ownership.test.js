@@ -64,11 +64,10 @@ test('refund for another owner returns 404', async () => {
   const originalTransaction = prisma.$transaction
   prisma.$transaction = async callback => callback({
     member: { findUnique: async () => ({ id: 7, groupId: 99, status: '正常', name: 'Secret', price: 10 }) },
-    group: { findFirst: async () => null }
+    group: { findUnique: async () => null }
   })
   try {
     const res = await dispatch({ method: 'PUT', path: '/members/7/refund', user: { id: 1, username: 'alice', active: true } })
     assert.equal(res.statusCode, 404)
   } finally { prisma.$transaction = originalTransaction }
 })
-
