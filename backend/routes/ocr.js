@@ -8,8 +8,10 @@ const multer = require('multer');
 const { spawn } = require('child_process');
 const path = require('path');
 const fs = require('fs');
+const { requireAuth } = require('../middleware/auth');
 
 const upload = multer({ dest: 'uploads/' });
+router.use(requireAuth);
 
 // OCR 服务脚本路径
 const OCR_SCRIPT = path.join(__dirname, '../ocr_service.py');

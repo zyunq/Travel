@@ -7,8 +7,14 @@ const { determineTicketType } = require('../utils/ticketType');
 const { generateTemplate } = require('../utils/templateGenerator');
 const { normalizeMemberPrice } = require('../utils/memberPayload');
 const { appendGroupNote, appendGroupNotes } = require('../utils/groupNotes');
+const { requireAuth } = require('../middleware/auth');
 
 const upload = multer({ dest: 'uploads/' });
+router.use(requireAuth);
+
+async function ownedGroup(groupId, userId) {
+  return prisma.group.findFirst({ where: { id: parseInt(groupId), ownerId: userId } });
+}
 
 // 下载导入模板
 router.get('/template', (req, res) => {
@@ -21,6 +27,7 @@ router.get('/template', (req, res) => {
 // 获取人员列表
 router.get('/groups/:groupId/members', async (req, res) => {
   const { groupId } = req.params;
+  if (!await ownedGroup(groupId, req.user.id)) return res.status(404).json({ error: '行程不存在' });
   const members = await prisma.member.findMany({
     where: { groupId: parseInt(groupId) },
     orderBy: { id: 'asc' }
@@ -32,7 +39,7 @@ router.get('/groups/:groupId/members', async (req, res) => {
 router.post('/groups/:groupId/members', async (req, res) => {
   try {
     const { groupId } = req.params;
-    const group = await prisma.group.findUnique({ where: { id: parseInt(groupId) } });
+    const group = await ownedGroup(groupId, req.user.id);
 
     if (!group) {
       return res.status(404).json({ error: '行程不存在' });
@@ -102,7 +109,7 @@ router.post('/groups/:groupId/members', async (req, res) => {
 // 批量导入人员
 router.post('/groups/:groupId/members/import', upload.single('file'), async (req, res) => {
   const { groupId } = req.params;
-  const group = await prisma.group.findUnique({ where: { id: parseInt(groupId) } });
+  const group = await ownedGroup(groupId, req.user.id);
 
   if (!req.file) {
     return res.status(400).json({ error: '请上传文件' });
@@ -150,16 +157,17 @@ router.put('/members/:id', async (req, res) => {
     }
   }
 
-  const member = await prisma.member.update({
-    where: { id: parseInt(id) },
-    data: updateData
-  });
-  res.json(member);
+  const member = await prisma.member.findUnique({ where: { id: parseInt(id) } });
+  if (!member || !await ownedGroup(member.groupId, req.user.id)) return res.status(404).json({ error: '乘客不存在' });
+  const updated = await prisma.member.update({ where: { id: parseInt(id) }, data: updateData });
+  res.json(updated);
 });
 
 // 删除人员
 router.delete('/members/:id', async (req, res) => {
   const { id } = req.params;
+  const member = await prisma.member.findUnique({ where: { id: parseInt(id) } });
+  if (!member || !await ownedGroup(member.groupId, req.user.id)) return res.status(404).json({ error: '乘客不存在' });
   await prisma.member.delete({ where: { id: parseInt(id) } });
   res.json({ success: true });
 });
@@ -171,6 +179,8 @@ router.put('/members/:id/refund', async (req, res) => {
     const result = await prisma.$transaction(async (tx) => {
       const member = await tx.member.findUnique({ where: { id: parseInt(id) } });
       if (!member) throw Object.assign(new Error('乘客不存在'), { status: 404 });
+      const owned = await tx.group.findFirst({ where: { id: member.groupId, ownerId: req.user.id } });
+      if (!owned) throw Object.assign(new Error('乘客不存在'), { status: 404 });
       if (member.status === '退票') return member;
 
       const group = await tx.group.findUnique({ where: { id: member.groupId } });
