@@ -59,7 +59,7 @@ router.post('/groups/:groupId/members', async (req, res) => {
     console.log('票型:', ticketType, '前端传入:', inputTicketType);
 
     const member = await prisma.$transaction(async (tx) => {
-      const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+      const currentGroup = await tx.group.findFirst({ where: { id: parseInt(groupId), ownerId: req.user.id } });
       if (!currentGroup) {
         throw Object.assign(new Error('行程不存在'), { status: 404 });
       }
@@ -123,7 +123,7 @@ router.post('/groups/:groupId/members/import', upload.single('file'), async (req
   const members = result.members;
 
   const importResult = await prisma.$transaction(async (tx) => {
-    const currentGroup = await tx.group.findUnique({ where: { id: parseInt(groupId) } });
+    const currentGroup = await tx.group.findFirst({ where: { id: parseInt(groupId), ownerId: req.user.id } });
     if (!currentGroup) throw Object.assign(new Error('行程不存在'), { status: 404 });
 
     const created = await tx.member.createMany({
@@ -198,8 +198,8 @@ router.put('/members/:id/refund', async (req, res) => {
     });
     res.json(result);
   } catch (error) {
-    console.error('退票失败:', error);
-    res.status(500).json({ error: error.message });
+    if (!error.status || error.status >= 500) console.error('退票失败:', error);
+    res.status(error.status || 500).json({ error: error.message });
   }
 });
 
