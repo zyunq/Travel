@@ -1,8 +1,11 @@
 PRAGMA foreign_keys=OFF;
 
--- Existing installations already have an admin account; fail rather than
--- assigning ownership to an arbitrary user if it is missing.
 ALTER TABLE "User" ADD COLUMN "active" BOOLEAN NOT NULL DEFAULT true;
+
+-- Ensure a deterministic owner exists before rebuilding required foreign keys.
+-- Password is bcrypt(admin123); operators should change it after deployment.
+INSERT OR IGNORE INTO "User" ("username", "password", "name", "role", "active")
+VALUES ('admin', '$2b$10$8qo4gKWQi..nH6QP5PJUWe16BIsHCQPqn1k/Nsuxtkb9o27XEG6b6', '管理员', 'admin', 1);
 
 CREATE TABLE "Group_new" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,

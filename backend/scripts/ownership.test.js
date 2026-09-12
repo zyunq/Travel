@@ -16,10 +16,11 @@ function makePrisma() {
       create: async ({ data }) => { const user = { id: state.users.length + 1, ...data }; state.users.push(user); return user }
     },
     group: {
-      updateMany: async ({ where, data }) => { const rows = state.groups.filter(g => where.ownerId === null ? g.ownerId == null : g.ownerId === where.ownerId); rows.forEach(g => Object.assign(g, data)); return { count: rows.length } }
+      findMany: async () => state.groups.map(({ id, ownerId }) => ({ id, ownerId })),
+      update: async ({ where, data }) => { const g = state.groups.find(g => g.id === where.id); Object.assign(g, data); return g }
     },
     feeConfig: {
-      findFirst: async ({ where } = {}) => state.feeConfigs.find(c => where.userId === undefined || c.userId === where.userId) || null,
+      findMany: async () => state.feeConfigs,
       findUnique: async ({ where }) => state.feeConfigs.find(c => c.userId === where.userId) || null,
       update: async ({ where, data }) => { const c = state.feeConfigs.find(c => c.id === where.id); Object.assign(c, data); return c },
       create: async ({ data }) => { const c = { id: state.feeConfigs.length + 1, ...data }; state.feeConfigs.push(c); return c }

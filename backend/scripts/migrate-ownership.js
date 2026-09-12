@@ -15,15 +15,25 @@ async function migrateOwnership({ prisma = prismaDefault } = {}) {
       }
     })
 
-    const groupsResult = await db.group.updateMany({
-      where: { ownerId: null },
-      data: { ownerId: resolvedAdmin.id }
-    })
+    let groupsUpdated = 0
+    if (db.group.findMany) {
+      const groups = await db.group.findMany({ select: { id: true, ownerId: true } })
+      for (const group of groups) {
+        if (group.ownerId == null) {
+          await db.group.update({ where: { id: group.id }, data: { ownerId: resolvedAdmin.id } })
+          groupsUpdated++
+        }
+      }
+    } else {
+      groupsUpdated = (await db.group.updateMany({ where: { ownerId: { equals: null } }, data: { ownerId: resolvedAdmin.id } })).count || 0
+    }
 
     let configUpdated = 0
     const adminConfig = await db.feeConfig.findUnique({ where: { userId: resolvedAdmin.id } })
     if (!adminConfig) {
-      const legacy = await db.feeConfig.findFirst({ where: { userId: null } })
+      const legacy = db.feeConfig.findMany
+        ? (await db.feeConfig.findMany()).find((config) => config.userId == null)
+        : await db.feeConfig.findFirst({ where: { userId: { equals: null } } })
       if (legacy) {
         await db.feeConfig.update({ where: { id: legacy.id }, data: { userId: resolvedAdmin.id } })
         configUpdated = 1
@@ -40,7 +50,7 @@ async function migrateOwnership({ prisma = prismaDefault } = {}) {
         configUpdated = 1
       }
     }
-    return { adminId: resolvedAdmin.id, groupsUpdated: groupsResult.count || 0, configUpdated }
+    return { adminId: resolvedAdmin.id, groupsUpdated, configUpdated }
   }
   return prisma.$transaction ? prisma.$transaction(run) : run(prisma)
 }

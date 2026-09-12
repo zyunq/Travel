@@ -16,5 +16,12 @@
 - `backend/scripts/ownership.test.js`; `backend/package.json` scripts.
 
 ## Concerns
-- SQL assumes an `admin` user exists when copying legacy rows; run admin initialization/ownership helper first if absent.
-- CLI positional password may be visible in shell history/process listings; use only in controlled server environments.
+- Migration now inserts a deterministic bcrypt-hashed `admin` account when absent; operators should change the default password after deployment.
+- CLI prompts on stdin by default; optional positional password remains for compatibility but may be visible in shell history/process listings.
+
+## Review follow-up
+
+- Reworked `migrateOwnership` to enumerate rows and update by primary key, avoiding invalid Prisma `where: { field: null }` filters against required schema fields; fee rows are similarly inspected in memory.
+- Migration SQL now deterministically inserts a bcrypt-hashed admin account when absent before enforcing ownership foreign keys, preventing null-owner/uniqueness failures.
+- CLI prompts for a password on stdin when omitted (`node scripts/create-user.js <username> <name>`), while retaining the exported API and optional positional compatibility.
+- Re-ran ownership tests: 4/4 pass.

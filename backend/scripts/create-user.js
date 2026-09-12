@@ -21,8 +21,15 @@ async function createUser({ prisma = prismaDefault, username, password, name }) 
 }
 
 if (require.main === module) {
-  const [username, password, name] = process.argv.slice(2)
-  createUser({ username, password, name }).then((user) => {
+  const [username, name, suppliedPassword] = process.argv.slice(2)
+  const readPassword = suppliedPassword
+    ? Promise.resolve(suppliedPassword)
+    : new Promise((resolve) => {
+      const readline = require('readline')
+      const rl = readline.createInterface({ input: process.stdin, output: process.stdout })
+      rl.question('Password: ', (answer) => { rl.close(); resolve(answer) })
+    })
+  readPassword.then((password) => createUser({ username, password, name })).then((user) => {
     console.log(`created user ${user.username} (id=${user.id})`)
   }).catch((error) => {
     console.error(error.message)
