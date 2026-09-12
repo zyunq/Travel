@@ -100,16 +100,16 @@ const ocrRouter = require('./routes/ocr');
 // re-checks the current database user (including active/deactivated state).
 app.locals.prisma = authRouter.prisma;
 
+// 健康检查必须保持公开，且要早于挂载在 /api 下的鉴权成员路由。
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok' });
+});
+
 app.use('/api/config', configRouter);
 app.use('/api/groups', groupsRouter);
 app.use('/api', membersRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/ocr', ocrRouter);
-
-// 健康检查
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok' });
-});
 
 // ============ 错误处理中间件 ============
 
