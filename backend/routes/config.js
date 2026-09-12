@@ -1,12 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const prisma = require('../prisma/client');
+const { requireAuth } = require('../middleware/auth');
+
+router.use(requireAuth);
 
 // 获取费用配置
 router.get('/', async (req, res) => {
-  let config = await prisma.feeConfig.findUnique({ where: { id: 1 } });
+  let config = await prisma.feeConfig.findUnique({ where: { userId: req.user.id } });
   if (!config) {
-    config = await prisma.feeConfig.create({ data: { id: 1 } });
+    config = await prisma.feeConfig.create({ data: { userId: req.user.id } });
   }
   res.json(config);
 });
@@ -15,7 +18,7 @@ router.get('/', async (req, res) => {
 router.put('/', async (req, res) => {
   const { serviceFee, refundServiceFee, foreignIdVerify, electronicInvoice } = req.body;
   const config = await prisma.feeConfig.upsert({
-    where: { id: 1 },
+    where: { userId: req.user.id },
     update: {
       serviceFee,
       refundServiceFee,
@@ -23,7 +26,7 @@ router.put('/', async (req, res) => {
       electronicInvoice
     },
     create: {
-      id: 1,
+      userId: req.user.id,
       serviceFee,
       refundServiceFee,
       foreignIdVerify,

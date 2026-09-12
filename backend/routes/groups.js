@@ -3,12 +3,17 @@ const router = express.Router();
 const multer = require('multer');
 const prisma = require('../prisma/client');
 const { parseExcel } = require('../utils/excelParser');
+const { requireAuth } = require('../middleware/auth');
 
 const upload = multer({ dest: 'uploads/' });
+
+// Every group operation is scoped to the authenticated account.
+router.use(requireAuth);
 
 // 获取旅游团列表
 router.get('/', async (req, res) => {
   const groups = await prisma.group.findMany({
+    where: { ownerId: req.user.id },
     orderBy: [{ category: 'asc' }, { groupName: 'asc' }, { tripType: 'asc' }],
     include: {
       _count: { select: { members: true } }
@@ -20,6 +25,7 @@ router.get('/', async (req, res) => {
 // 获取所有分类
 router.get('/categories', async (req, res) => {
   const groups = await prisma.group.findMany({
+    where: { ownerId: req.user.id },
     select: { category: true },
     distinct: ['category']
   });
@@ -36,7 +42,8 @@ router.post('/merge', async (req, res) => {
 
   const result = await prisma.group.updateMany({
     where: {
-      groupName: { in: groupNames }
+      groupName: { in: groupNames },
+      ownerId: req.user.id
     },
     data: { category }
   });
@@ -49,7 +56,7 @@ router.delete('/category/:category', async (req, res) => {
   const { category } = req.params;
 
   const result = await prisma.group.updateMany({
-    where: { category },
+    where: { category, ownerId: req.user.id },
     data: { category: null }
   });
 
@@ -59,6 +66,7 @@ router.delete('/category/:category', async (req, res) => {
 // 获取所有团名
 router.get('/group-names', async (req, res) => {
   const groups = await prisma.group.findMany({
+    where: { ownerId: req.user.id },
     select: { groupName: true },
     distinct: ['groupName']
   });
@@ -69,7 +77,7 @@ router.get('/group-names', async (req, res) => {
 router.get('/by-name/:groupName', async (req, res) => {
   const { groupName } = req.params;
   const trips = await prisma.group.findMany({
-    where: { groupName },
+    where: { groupName, ownerId: req.user.id },
     orderBy: { tripType: 'asc' },
     include: { members: true }
   });
@@ -78,7 +86,7 @@ router.get('/by-name/:groupName', async (req, res) => {
     return res.status(404).json({ error: '团不存在' });
   }
 
-  const config = await prisma.feeConfig.findUnique({ where: { id: 1 } });
+  const config = await prisma.feeConfig.findUnique({ where: { userId: req.user.id } });
 
   const tripsWithSummary = trips.map(trip => {
     const adultCount = trip.members.filter(m => m.ticketType === '成人' && m.status === '正常').length;
@@ -89,9 +97,9 @@ router.get('/by-name/:groupName', async (req, res) => {
     const serviceFeeCount = trip.serviceFeeCount || trip.members.length;
 
     const ticketTotal = adultCount * trip.adultPrice + childCount * trip.childPrice;
-    const serviceFee = serviceFeeCount * (config?.serviceFee || 10);
-    const refundFee = refundCount * (config?.refundServiceFee || 20);
-    const verifyFee = trip.verifyCount * (config?.foreignIdVerify || 8);
+    const serviceFee = serviceFeeCount * (config?.serviceFee ?? 10);
+    const refundFee = refundCount * (config?.refundServiceFee ?? 20);
+    const verifyFee = trip.verifyCount * (config?.foreignIdVerify ?? 8);
     const total = ticketTotal + serviceFee + refundFee + verifyFee;
 
     return {
@@ -117,8 +125,8 @@ router.get('/by-name/:groupName', async (req, res) => {
 // 获取团详情（含费用汇总）
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const group = await prisma.group.findUnique({
-    where: { id: parseInt(id) },
+  const group = await prisma.group.findFirst({
+    where: { id: parseInt(id), ownerId: req.user.id },
     include: { members: true }
   });
 
@@ -135,12 +143,12 @@ router.get('/:id', async (req, res) => {
     ? group.serviceFeeCount
     : group.members.length;
 
-  const config = await prisma.feeConfig.findUnique({ where: { id: 1 } });
+  const config = await prisma.feeConfig.findUnique({ where: { userId: req.user.id } });
 
   const ticketTotal = adultCount * group.adultPrice + childCount * group.childPrice;
-  const serviceFee = serviceFeeCount * (config?.serviceFee || 10);
-  const refundFee = refundCount * (config?.refundServiceFee || 20);
-  const verifyFee = group.verifyCount * (config?.foreignIdVerify || 8);
+  const serviceFee = serviceFeeCount * (config?.serviceFee ?? 10);
+  const refundFee = refundCount * (config?.refundServiceFee ?? 20);
+  const verifyFee = group.verifyCount * (config?.foreignIdVerify ?? 8);
   const total = ticketTotal + serviceFee + refundFee + verifyFee;
 
   res.json({
@@ -154,6 +162,8 @@ router.get('/:id', async (req, res) => {
 router.put('/:id', async (req, res) => {
   const { id } = req.params;
   const { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount, notes } = req.body;
+  const existing = await prisma.group.findFirst({ where: { id: parseInt(id), ownerId: req.user.id } });
+  if (!existing) return res.status(404).json({ error: '团不存在' });
   const group = await prisma.group.update({
     where: { id: parseInt(id) },
     data: { name, groupName, tripType, departDate, trainNo, route, adultPrice, childPrice, verifyCount, ...(notes !== undefined ? { notes } : {}) }
@@ -164,7 +174,14 @@ router.put('/:id', async (req, res) => {
 const createDeleteGroupHandler = (db) => async (req, res, next) => {
   try {
     const { id } = req.params;
-    await db.group.delete({ where: { id: parseInt(id) } });
+    if (typeof db.group.deleteMany === 'function') {
+      const result = await db.group.deleteMany({ where: { id: parseInt(id), ownerId: req.user.id } });
+      if (!result.count) throw Object.assign(new Error('团不存在'), { status: 404 });
+    } else {
+      const group = await db.group.findUnique({ where: { id: parseInt(id) } });
+      if (!group || (req.user && group.ownerId !== req.user.id)) throw Object.assign(new Error('团不存在'), { status: 404 });
+      await db.group.delete({ where: { id: parseInt(id) } });
+    }
     res.json({ success: true });
   } catch (error) {
     next(error);
@@ -177,8 +194,8 @@ router.delete('/:id', createDeleteGroupHandler(prisma));
 // 复制团信息
 router.get('/:id/copy', async (req, res) => {
   const { id } = req.params;
-  const group = await prisma.group.findUnique({
-    where: { id: parseInt(id) },
+  const group = await prisma.group.findFirst({
+    where: { id: parseInt(id), ownerId: req.user.id },
     include: { members: true }
   });
 
@@ -193,12 +210,12 @@ router.get('/:id/copy', async (req, res) => {
   // 购票服务费人数：使用累计值（只增不减）
   const serviceFeeCount = group.serviceFeeCount || group.members.length;
 
-  const config = await prisma.feeConfig.findUnique({ where: { id: 1 } });
+  const config = await prisma.feeConfig.findUnique({ where: { userId: req.user.id } });
 
   const ticketTotal = adultCount * group.adultPrice + childCount * group.childPrice;
-  const serviceFee = serviceFeeCount * (config?.serviceFee || 10);
-  const refundFee = refundCount * (config?.refundServiceFee || 20);
-  const verifyFee = group.verifyCount * (config?.foreignIdVerify || 8);
+  const serviceFee = serviceFeeCount * (config?.serviceFee ?? 10);
+  const refundFee = refundCount * (config?.refundServiceFee ?? 20);
+  const verifyFee = group.verifyCount * (config?.foreignIdVerify ?? 8);
   const total = ticketTotal + serviceFee + refundFee + verifyFee;
 
   const text = `团名：${group.name}
@@ -210,9 +227,9 @@ router.get('/:id/copy', async (req, res) => {
 儿童票：${childCount}张 × ${group.childPrice}元 = ${childCount * group.childPrice}元
 ────────────────────
 票价小计：${ticketTotal}元
-购票服务费：${serviceFeeCount}张 × ${config?.serviceFee || 10}元 = ${serviceFee}元
-退票服务费：${refundCount}张 × ${config?.refundServiceFee || 20}元 = ${refundFee}元
-核验费：${group.verifyCount}次 × ${config?.foreignIdVerify || 8}元 = ${verifyFee}元
+购票服务费：${serviceFeeCount}张 × ${config?.serviceFee ?? 10}元 = ${serviceFee}元
+退票服务费：${refundCount}张 × ${config?.refundServiceFee ?? 20}元 = ${refundFee}元
+核验费：${group.verifyCount}次 × ${config?.foreignIdVerify ?? 8}元 = ${verifyFee}元
 备注：
 ${group.notes || '无'}
 ────────────────────
@@ -271,6 +288,7 @@ router.post('/import', upload.single('file'), async (req, res) => {
         childPrice,
         verifyCount: 0,
         serviceFeeCount: members.length,  // 初始购票张数
+        ownerId: req.user.id,
         members: { create: members }
       },
       include: { members: true }
@@ -293,8 +311,8 @@ router.post('/import', upload.single('file'), async (req, res) => {
 // 导出座位表 Excel - 使用Python工具
 router.get('/:id/seats', async (req, res) => {
   const { id } = req.params;
-  const group = await prisma.group.findUnique({
-    where: { id: parseInt(id) },
+  const group = await prisma.group.findFirst({
+    where: { id: parseInt(id), ownerId: req.user.id },
     include: { members: true }
   });
 
