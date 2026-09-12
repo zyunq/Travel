@@ -2,6 +2,12 @@
 export default {
   onLaunch: function() {
     console.log('App Launch')
+    const originalRequest = uni.request
+    uni.request = (options = {}) => {
+      const token = uni.getStorageSync('token')
+      options.header = { ...(options.header || {}), ...(token ? { Authorization: `Bearer ${token}` } : {}) }
+      return originalRequest(options)
+    }
   },
   onShow: function() {
     console.log('App Show')
