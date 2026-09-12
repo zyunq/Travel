@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node app.js",
     "dev": "node app.js",
-    "init-admin": "node scripts/init-admin.js"
+    "init-admin": "node scripts/init-admin.js",
+    "migrate-ownership": "node scripts/migrate-ownership.js",
+    "create-user": "node scripts/create-user.js",
+    "test": "node --test"
   },
   "keywords": [
     "travel",

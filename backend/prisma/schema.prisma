@@ -21,6 +21,8 @@ model Group {
   verifyCount     Int      @default(0)
   serviceFeeCount Int      @default(0)  // 累计购票张数（只增不减）
   notes           String   @default("")
+  ownerId         Int
+  owner           User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   members         Member[]
 }
 
@@ -46,10 +48,12 @@ model Member {
 
 model FeeConfig {
   id                Int   @id @default(1)
-  serviceFee        Float @default(10)
-  refundServiceFee  Float @default(20)
-  foreignIdVerify   Float @default(8)
-  electronicInvoice Float @default(3)
+  userId            Int   @unique
+  serviceFee        Float @default(0)
+  refundServiceFee  Float @default(0)
+  foreignIdVerify   Float @default(0)
+  electronicInvoice Float @default(0)
+  user             User  @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model User {
@@ -58,4 +62,7 @@ model User {
   password String
   name     String
   role     String @default("user")
+  active   Boolean @default(true)
+  groups   Group[]
+  feeConfig FeeConfig?
 }
