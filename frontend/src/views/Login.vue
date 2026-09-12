@@ -97,7 +97,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import { api } from '../api'
 
 const router = useRouter()
 const loading = ref(false)
@@ -132,7 +132,7 @@ const handleLogin = async () => {
 
   loading.value = true
   try {
-    const response = await axios.post('/api/auth/login', {
+    const response = await api.post('/auth/login', {
       username: form.username,
       password: form.password
     })
@@ -144,7 +144,8 @@ const handleLogin = async () => {
       localStorage.removeItem('rememberedUsername')
     }
 
-    localStorage.setItem('user', JSON.stringify(response.data))
+    localStorage.setItem('token', response.data.token)
+    localStorage.setItem('user', JSON.stringify(response.data.user))
 
     ElMessage.success('登录成功')
     router.push('/')
@@ -163,17 +164,22 @@ const changePassword = async () => {
 
   try {
     // 先登录验证原密码
-    const loginRes = await axios.post('/api/auth/login', {
+    const loginRes = await api.post('/auth/login', {
       username: pwdForm.username,
       password: pwdForm.oldPassword
     })
+    const previousToken = localStorage.getItem('token')
+    if (!previousToken) localStorage.setItem('token', loginRes.data.token)
 
     // 修改密码
-    await axios.put('/api/auth/password', {
-      userId: loginRes.data.id,
+    await api.put('/auth/password', {
       oldPassword: pwdForm.oldPassword,
       newPassword: pwdForm.newPassword
     })
+    if (!previousToken) {
+      localStorage.removeItem('token')
+      localStorage.removeItem('user')
+    }
 
     ElMessage.success('密码修改成功')
     showChangePassword.value = false

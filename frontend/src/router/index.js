@@ -22,11 +22,11 @@ const router = createRouter({
 
 // 路由守卫
 router.beforeEach((to, from, next) => {
-  const user = localStorage.getItem('user')
+  const token = localStorage.getItem('token')
 
-  if (to.meta.requiresAuth && !user) {
+  if (to.meta.requiresAuth && !token) {
     next('/login')
-  } else if (to.path === '/login' && user) {
+  } else if (to.path === '/login' && token) {
     next('/')
   } else {
     next()
