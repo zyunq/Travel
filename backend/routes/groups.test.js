@@ -1,5 +1,6 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
+process.env.JWT_SECRET = process.env.JWT_SECRET || 'test-secret'
 
 const groupsRouter = require('./groups')
 

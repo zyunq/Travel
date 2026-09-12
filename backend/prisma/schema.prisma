@@ -47,7 +47,7 @@ model Member {
 }
 
 model FeeConfig {
-  id                Int   @id @default(1)
+  id                Int   @id @default(autoincrement())
   userId            Int   @unique
   serviceFee        Float @default(0)
   refundServiceFee  Float @default(0)

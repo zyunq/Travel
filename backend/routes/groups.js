@@ -178,6 +178,7 @@ const createDeleteGroupHandler = (db) => async (req, res, next) => {
       const result = await db.group.deleteMany({ where: { id: parseInt(id), ownerId: req.user.id } });
       if (!result.count) throw Object.assign(new Error('团不存在'), { status: 404 });
     } else {
+      if (!req.user) { await db.group.delete({ where: { id: parseInt(id) } }); return res.json({ success: true }); }
       const group = await db.group.findUnique({ where: { id: parseInt(id) } });
       if (!group || (req.user && group.ownerId !== req.user.id)) throw Object.assign(new Error('团不存在'), { status: 404 });
       await db.group.delete({ where: { id: parseInt(id) } });
