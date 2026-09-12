@@ -27,4 +27,3 @@ node --test
 ```
 
 Result: 23 tests passed, 0 failed.
-
