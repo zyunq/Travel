@@ -67,12 +67,16 @@ git clone <您的仓库地址> .
 ```bash
 cd /var/www/travel/backend
 
+# 配置 JWT 密钥（不要提交到 Git）
+export JWT_SECRET="$(openssl rand -hex 32)"
+
 # 安装依赖
 npm install
 
 # 初始化数据库
 npx prisma generate
 npx prisma migrate deploy
+node scripts/migrate-ownership.js
 
 # 创建必要目录
 mkdir -p logs uploads
@@ -119,8 +123,9 @@ npm run build:mp-weixin
 # 健康检查
 curl https://api.zyqing.xyz/api/health
 
-# 测试配置接口
-curl https://api.zyqing.xyz/api/config
+# 登录并携带 token 访问配置
+TOKEN=$(curl -s -X POST https://api.zyqing.xyz/api/auth/login -H 'Content-Type: application/json' -d '{"username":"admin","password":"admin123"}' | jq -r .token)
+curl -H "Authorization: Bearer $TOKEN" https://api.zyqing.xyz/api/config
 ```
 
 ### 测试小程序

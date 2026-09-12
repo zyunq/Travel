@@ -110,8 +110,11 @@ scp -r backend/* root@101.34.71.12:/var/www/travel/backend/
 # 在服务器上
 cd /var/www/travel/backend
 npm install
+echo 'JWT_SECRET=<long-random-secret>' > .env
+set -a; source .env; set +a
 npx prisma generate
 npx prisma migrate deploy
+node scripts/migrate-ownership.js
 
 # 创建管理员账号
 node scripts/init-admin.js
@@ -121,6 +124,9 @@ node scripts/init-admin.js
 pm2 start deploy/pm2/ecosystem.config.js
 pm2 startup
 pm2 save
+
+# 创建新账号（密码省略时交互式输入）
+node scripts/create-user.js alice Alice
 ```
 
 ### 第五步：配置 Nginx ⏱️ 5分钟
